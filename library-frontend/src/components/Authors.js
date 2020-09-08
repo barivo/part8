@@ -1,11 +1,34 @@
-  
 import React from 'react'
+import { useQuery, gql } from '@apollo/client'
+import UpdateAuthor from './UpdateAuthor'
+
+const AUTHOR_DETAILS = gql`
+  fragment AuthorDetails on Author {
+    name
+    born
+    bookCount
+    id
+  }
+`
+
+const AUTHORS = gql`
+  {
+    allAuthors {
+      ...AuthorDetails
+    }
+  }
+  ${AUTHOR_DETAILS}
+`
 
 const Authors = (props) => {
+  const { loading, error, data } = useQuery(AUTHORS)
+
+  if (loading) return <p>Loading...</p>
+  if (error) return <p>Error :(</p>
+
   if (!props.show) {
     return null
   }
-  const authors = []
 
   return (
     <div>
@@ -14,23 +37,20 @@ const Authors = (props) => {
         <tbody>
           <tr>
             <th></th>
-            <th>
-              born
-            </th>
-            <th>
-              books
-            </th>
+            <th>born</th>
+            <th>books</th>
           </tr>
-          {authors.map(a =>
-            <tr key={a.name}>
+          {data.allAuthors.map((a) => (
+            <tr key={a.id}>
               <td>{a.name}</td>
               <td>{a.born}</td>
               <td>{a.bookCount}</td>
             </tr>
-          )}
+          ))}
         </tbody>
       </table>
 
+      <UpdateAuthor authors={data.allAuthors} />
     </div>
   )
 }
