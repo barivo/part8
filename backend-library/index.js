@@ -9,6 +9,7 @@ const mongoose = require("mongoose");
 
 const Author = require("./models/author");
 const Book = require("./models/book");
+const User = require("./models/User");
 
 const { booksdata, authorsdata } = require("./data");
 const author = require("./models/author");
@@ -34,6 +35,16 @@ mongoose
   });
 
 const typeDefs = gql`
+  type User {
+    username: String!
+    favoriteGenre: String!
+    id: ID!
+  }
+
+  type Token {
+    value: String!
+  }
+
   type Book {
     title: String!
     published: Int!
@@ -54,6 +65,7 @@ const typeDefs = gql`
     allAuthors: [Author!]
     bookCount: Int!
     authorCount: Int!
+    me: User
   }
 
   type Mutation {
@@ -64,7 +76,11 @@ const typeDefs = gql`
       genres: [String]!
     ): Book
 
-    editAuthor(name: String!, born: Int): Author
+    deleteBook(title: String!): String
+    editAuthor(name: String!, setBornTo: Int): Author
+
+    createUser(username: String!, favoriteGenre: String!): User
+    login(username: String!, password: String!): Token
   }
 `;
 
@@ -101,16 +117,119 @@ const resolvers = {
     bookCount: () => Book.collection.count(),
 
     authorCount: () => Author.collection.count(),
+
+    me: (root, arg, { currentUser }) => currentUser,
   },
 
   Mutation: {
-    addBook: async (root, args) => {
-      const book = new Book(args);
-      console.log(book);
+    editAuthor: async (root, args, context) => {
+      if (!context.currentUser) {
+        throw new AuthenticationError("not authenticated");
+      }
+      try {
+        const query = { name: args.name };
+        const author = await Author.findOneAndUpdate(query, {
+          born: args.setBornTo,
+        });
+        return author;
+      } catch (error) {
+        throw new UserInputError("error updating author");
+      }
+    },
+
+    addBook: async (root, args, { currentUser }) => {
+      if (!currentUser) {
+        throw new AuthenticationError("not authenticated");
+      }
+
+      if (args.title.length < 4 || args.author.length < 4)
+        throw new UserInputError(
+          "titles and author names must be at least 4 characters long"
+        );
+      if (
+        !(
+          args.title ||
+          args.author ||
+          args.publishe ||
+          args.genres ||
+          args.author
+        )
+      )
+        throw new UserInputError(
+          "books require a: title, author, published (date) and genres: ['list of genres']"
+        );
+      try {
+        const author = await createAuthorIfOneDoenstExist(args.author);
+        let bookArgs = { ...args };
+        bookArgs.author = author;
+
+        const book = new Book(bookArgs);
+        book.save();
+        return book;
+      } catch (error) {
+        throw new UserInputError("error creating book");
+      }
+    },
+
+    deleteBook: async (root, args) => {
+      try {
+        const book = await Book.find({ title: args.title });
+        if (book.length > 1) {
+          await Book.deleteOne({ title: book[0].title });
+          return `${args.title} was deleted`;
+        }
+        return "book not found";
+      } catch (error) {
+        throw new UserInputError("error deleting book");
+      }
+    },
+
+    // user and login/ logout mutations
+    createUser: async (root, args) => {
+      const user = new User({ ...args });
+      try {
+        await user.save();
+      } catch (error) {
+        throw new UserInputError(
+          "error creating user. username must be unique"
+        );
+      }
+      return user;
+    },
+    login: async (root, args) => {
+      try {
+        const user = await User.findOne({ username: args.username });
+        if (!user || args.password !== "password")
+          throw new UserInputError("incorrect username or password");
+
+        const tokenForUser = { username: user.username, id: user._id };
+        return { value: jwt.sign(tokenForUser, JWT_SECRET) };
+      } catch (error) {
+        throw new UserInputError(error.message, {
+          invalidArgs: args,
+        });
+      }
     },
   },
 };
 
+// helper functions for queries and mutations
+const createAuthorIfOneDoenstExist = async name => {
+  const author = await Author.find({ name: name });
+  if (author.length > 0) return author[0];
+  else {
+    let newAuthor = new Author({ name, born: null });
+    try {
+      newAuthor.save();
+      return newAuthor;
+    } catch (error) {
+      throw new UserInputError("error creating new author");
+    }
+  }
+};
+
+/* initialize library using json data */
+/*
 const initLibrary = async () => {
   let authors = await Author.find({});
   if (!authors.length > 0) {
@@ -135,9 +254,18 @@ const initLibrary = async () => {
 };
 
 initLibrary();
+*/
 const server = new ApolloServer({
   typeDefs,
   resolvers,
+  context: async ({ req }) => {
+    const auth = req ? req.headers.authorization : null;
+    if (auth && auth.toLowerCase().startsWith("bearer ")) {
+      const decodedToken = jwt.verify(auth.substring(7), JWT_SECRET);
+      const currentUser = await User.findById(decodedToken.id);
+      return { currentUser };
+    }
+  },
 });
 
 server.listen().then(({ url }) => {

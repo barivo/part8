@@ -4,7 +4,8 @@
 public
 package-lock.json
 
-country-hook
+.vscode
+
 # dependencies
 /node_modules
 /.pnp
