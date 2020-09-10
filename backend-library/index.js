@@ -2,7 +2,7 @@ const {
   ApolloServer,
   UserInputError,
   gql,
-  AuthenticationError,
+  AuthenticationError
 } = require("apollo-server");
 const jwt = require("jsonwebtoken");
 const mongoose = require("mongoose");
@@ -100,7 +100,7 @@ const resolvers = {
         return books.filter(b => b.author.name === args.author);
       } else if (args.author && args.genre) {
         const books = await Book.find({
-          genres: { $in: [args.genre] },
+          genres: { $in: [args.genre] }
         }).populate("author");
         return books.filter(b => b.author.name === args.author);
       }
@@ -118,7 +118,7 @@ const resolvers = {
 
     authorCount: () => Author.collection.count(),
 
-    me: (root, arg, { currentUser }) => currentUser,
+    me: (root, arg, { currentUser }) => currentUser
   },
 
   Mutation: {
@@ -129,7 +129,7 @@ const resolvers = {
       try {
         const query = { name: args.name };
         const author = await Author.findOneAndUpdate(query, {
-          born: args.setBornTo,
+          born: args.setBornTo
         });
         return author;
       } catch (error) {
@@ -173,9 +173,9 @@ const resolvers = {
 
     deleteBook: async (root, args) => {
       try {
-        const book = await Book.find({ title: args.title });
-        if (book.length > 1) {
-          await Book.deleteOne({ title: book[0].title });
+        const book = await Book.findOne({ title: args.title });
+        if (book) {
+          await Book.deleteOne({ title: book.title });
           return `${args.title} was deleted`;
         }
         return "book not found";
@@ -206,11 +206,11 @@ const resolvers = {
         return { value: jwt.sign(tokenForUser, JWT_SECRET) };
       } catch (error) {
         throw new UserInputError(error.message, {
-          invalidArgs: args,
+          invalidArgs: args
         });
       }
-    },
-  },
+    }
+  }
 };
 
 // helper functions for queries and mutations
@@ -265,7 +265,7 @@ const server = new ApolloServer({
       const currentUser = await User.findById(decodedToken.id);
       return { currentUser };
     }
-  },
+  }
 });
 
 server.listen().then(({ url }) => {

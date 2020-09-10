@@ -16,13 +16,17 @@ const ADD_BOOK = gql`
     ) {
       id
       title
-      author
+      author {
+        name
+        born
+        id
+      }
       published
       genres
     }
   }
 `
-const NewBook = props => {
+const NewBook = (props) => {
   const [title, setTitle] = useState('')
   const [author, setAuhtor] = useState('')
   const [published, setPublished] = useState('')
@@ -35,7 +39,7 @@ const NewBook = props => {
     return null
   }
 
-  const submit = async event => {
+  const submit = async (event) => {
     event.preventDefault()
 
     addBook({
