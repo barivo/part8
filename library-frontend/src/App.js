@@ -1,10 +1,51 @@
 import React, { useState, useEffect } from 'react'
-import { useApolloClient, useLazyQuery, gql } from '@apollo/client'
+import {
+  useApolloClient,
+  useSubscription,
+  useLazyQuery,
+  gql,
+} from '@apollo/client'
 import Authors from './components/Authors'
 import Books from './components/Books'
 import NewBook from './components/NewBook'
 import Login from './components/Login'
 
+const BOOKS = gql`
+  query AllBooks($author: String, $genre: String) {
+    allBooks(author: $author, genre: $genre) {
+      title
+      author {
+        name
+        born
+        id
+      }
+      published
+      genres
+      id
+    }
+  }
+`
+
+const BOOK_DETAILS = gql`
+  fragment BookDetails on Book {
+    title
+    author {
+      name
+      born
+    }
+    published
+    genres
+    id
+  }
+`
+const BOOK_ADDED = gql`
+  subscription {
+    bookAdded {
+      ...BookDetails
+    }
+  }
+  ${BOOK_DETAILS}
+`
 const ME = gql`
   {
     me {
@@ -55,6 +96,31 @@ const App = () => {
       setErrorMessage(null)
     }, 5000)
   }
+
+  const [message, setMessage] = useState(null)
+
+  const updateCacheWith = (addedBook) => {
+    const includedIn = (set, object) => set.map((p) => p.id).includes(object.id)
+
+    const cache = client.readQuery({ query: BOOKS })
+    if (!includedIn(cache.allBooks, addedBook)) {
+      client.writeQuery({
+        query: BOOKS,
+        data: { allBooks: cache.allBooks.concat(addedBook) },
+      })
+    }
+  }
+
+  useSubscription(BOOK_ADDED, {
+    onSubscriptionData: ({ subscriptionData }) => {
+      const addedBook = subscriptionData.data.bookAdded
+      updateCacheWith(addedBook)
+      setPage('books')
+      setMessage(`${addedBook.title} has been added`)
+      setTimeout(() => setMessage(null), 3000)
+    },
+  })
+
   return (
     <div>
       <div>
@@ -72,6 +138,7 @@ const App = () => {
       </div>
 
       <Notify errorMessage={errorMessage} />
+      {message && <h2 style={{ color: 'blue' }}>{message}</h2>}
 
       <Login
         show={page === 'login'}

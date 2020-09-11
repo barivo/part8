@@ -82,7 +82,14 @@ const typeDefs = gql`
     createUser(username: String!, favoriteGenre: String!): User
     login(username: String!, password: String!): Token
   }
+
+  type Subscription {
+    bookAdded: Book!
+  }
 `;
+
+const { PubSub } = require("apollo-server");
+const pubsub = new PubSub();
 
 const resolvers = {
   Query: {
@@ -165,6 +172,9 @@ const resolvers = {
 
         const book = new Book(bookArgs);
         book.save();
+
+        pubsub.publish("BOOK_ADDED", { bookAdded: book });
+
         return book;
       } catch (error) {
         throw new UserInputError("error creating book");
@@ -196,6 +206,7 @@ const resolvers = {
       }
       return user;
     },
+
     login: async (root, args) => {
       try {
         const user = await User.findOne({ username: args.username });
@@ -209,6 +220,12 @@ const resolvers = {
           invalidArgs: args
         });
       }
+    }
+  },
+
+  Subscription: {
+    bookAdded: {
+      subscribe: () => pubsub.asyncIterator(["BOOK_ADDED"])
     }
   }
 };
@@ -268,6 +285,7 @@ const server = new ApolloServer({
   }
 });
 
-server.listen().then(({ url }) => {
+server.listen().then(({ url, subscriptionsUrl }) => {
   console.log(`Server ready at ${url}`);
+  console.log(`Subscriptions ready at ${subscriptionsUrl}`);
 });
