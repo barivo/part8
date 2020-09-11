@@ -1,9 +1,9 @@
-import React from 'react'
-import { useQuery, gql } from '@apollo/client'
+import React, { useState, useEffect } from 'react'
+import { useLazyQuery, gql, useQuery } from '@apollo/client'
 
 const BOOKS = gql`
-  {
-    allBooks {
+  query AllBooks($author: String, $genre: String) {
+    allBooks(author: $author, genre: $genre) {
       title
       author {
         name
@@ -16,20 +16,72 @@ const BOOKS = gql`
     }
   }
 `
-const Books = (props) => {
-  const { loading, error, data } = useQuery(BOOKS)
+
+const Books = ({ favorite, show, page }) => {
+  const [genre, setGenre] = useState('')
+  const [getBooks, { loading, error, data }] = useLazyQuery(BOOKS)
+
+  const initBooks = useQuery(BOOKS)
+
+  useEffect(() => {
+    if (page === 'recommend') {
+      getBooks({ variables: { genre: favorite } })
+    } else {
+      if (!genre) {
+        getBooks()
+      } else {
+        getBooks({ variables: { genre } })
+      }
+    }
+  }, [genre, getBooks, page, favorite])
 
   if (loading) return <p>Loading...</p>
   if (error) return <p>Error :(</p>
 
-  if (!props.show) {
+  if (!show) {
     return null
+  }
+
+  const genresList =
+    !initBooks.loading && initBooks.data ? initBooks.data.allBooks : []
+
+  const genres = new Set(genresList.map((b) => b.genres).flat())
+
+  const showGenres = Array.from(genres).map((g) => (
+    <button key={g} onClick={() => setGenre(g)}>
+      {g}
+    </button>
+  ))
+
+  const recommendationHeading = () => {
+    return (
+      <div>
+        <h2>recomendations</h2>
+        <p>
+          books in your favorite genre: <strong>{favorite}</strong>{' '}
+        </p>
+      </div>
+    )
+  }
+
+  const headingForBooksFilteredByGenre = () => {
+    return (
+      <div>
+        <h2>books</h2>
+        {genre ? (
+          <p>
+            in genre: <strong>{genre}</strong>{' '}
+          </p>
+        ) : null}
+      </div>
+    )
   }
 
   return (
     <div>
-      <h2>books</h2>
-
+      {page === 'recommend'
+        ? recommendationHeading()
+        : headingForBooksFilteredByGenre()}
       <table>
         <tbody>
           <tr>
@@ -46,6 +98,12 @@ const Books = (props) => {
           ))}
         </tbody>
       </table>
+      {page === 'books' ? (
+        <div>
+          {showGenres}
+          <button onClick={() => setGenre('')}>all genres</button>
+        </div>
+      ) : null}
     </div>
   )
 }

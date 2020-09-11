@@ -8,12 +8,13 @@ const LOGIN = gql`
     }
   }
 `
-const Login = ({ setError, setToken, setPage, show }) => {
+
+const Login = ({ setError, setToken, setUser, setPage, show }) => {
   const [username, setUserName] = useState('')
   const [password, setPassword] = useState('')
 
   const [login, { data }] = useMutation(LOGIN, {
-    onError: (error) => {
+    onError: error => {
       setError(error.graphQLErrors[0].message)
     },
   })
@@ -29,7 +30,7 @@ const Login = ({ setError, setToken, setPage, show }) => {
     }
   }, [data, setToken, setPage])
 
-  const submit = async (e) => {
+  const submit = async e => {
     e.preventDefault()
     login({ variables: { username, password } })
   }
