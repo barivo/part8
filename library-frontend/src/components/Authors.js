@@ -20,7 +20,7 @@ const AUTHORS = gql`
   ${AUTHOR_DETAILS}
 `
 
-const Authors = (props) => {
+const Authors = props => {
   const { loading, error, data } = useQuery(AUTHORS)
 
   if (loading) return <p>Loading...</p>
@@ -40,7 +40,7 @@ const Authors = (props) => {
             <th>born</th>
             <th>books</th>
           </tr>
-          {data.allAuthors.map((a) => (
+          {data.allAuthors.map(a => (
             <tr key={a.id}>
               <td>{a.name}</td>
               <td>{a.born}</td>
